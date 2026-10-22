@@ -36,7 +36,7 @@ test('connected workbench logs in and creates a persisted room through API', asy
     if(url.endsWith('/workspaces/workspace-1/rooms')&&options?.method==='POST')return {id:'room-1',name:'团队讨论',revision:1};
     if(url.endsWith('/workspaces/workspace-1/rooms'))return [];
     if(url.includes('/bots?'))return [];
-    if(url.endsWith('/rooms/room-1/bootstrap'))return {messages:[],snapshot_seq:0,room:{id:'room-1',name:'团队讨论',revision:1,archived:false}};
+    if(url.endsWith('/rooms/room-1/bootstrap'))return {messages:[{id:'message-bot-1',message_seq:1,sender_type:'BOT',body:'**加粗结论**\n\n1. 第一项'}],snapshot_seq:1,room:{id:'room-1',name:'团队讨论',revision:1,archived:false}};
     if(url.endsWith('/rooms/room-1/bots'))return [];
     if(url.endsWith('/realtime/tickets'))return {ticket:'test-ticket'};
     if(url.includes('/records?'))return [{id:'message-1',room_id:'room-1',room_name:'团队讨论',message_seq:1,sender_type:'USER',body:'项目计划',created_at:'2026-10-22T00:00:00'}];
@@ -54,6 +54,7 @@ test('connected workbench logs in and creates a persisted room through API', asy
   fireEvent.change(screen.getByRole('textbox',{name:'名称'}),{target:{value:'团队讨论'}});
   fireEvent.click(screen.getByRole('button',{name:'保存'}));
   await waitFor(()=>expect(screen.getByText('团队消息与 Bot 任务实时同步')).toBeTruthy());
+  await waitFor(()=>expect(screen.getByText('加粗结论').tagName).toBe('STRONG'));
   expect(calls.some(([url,options])=>url.endsWith('/workspaces/workspace-1/rooms')&&options?.method==='POST')).toBe(true);
   fireEvent.click(screen.getByRole('button',{name:'协作记录'}));
   await waitFor(()=>expect(screen.getByText('项目计划')).toBeTruthy());
