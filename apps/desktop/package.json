@@ -1,0 +1,1 @@
+{"name":"@tongpin/desktop","private":true,"type":"commonjs","main":"main.cjs","scripts":{"dev":"electron ."}}
