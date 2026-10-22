@@ -1,14 +1,21 @@
 {
   "name": "tongpin-ai",
+  "version": "0.1.0",
+  "main": "apps/desktop/main.cjs",
   "private": true,
   "type": "module",
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "website:dev": "npm run dev -w @tongpin/website",
     "workbench:dev": "npm run dev -w @tongpin/workbench-app",
     "website:build": "npm run build -w @tongpin/website",
     "workbench:build": "npm run build -w @tongpin/workbench-app",
     "desktop:dev": "npm run dev -w @tongpin/desktop",
+    "desktop:pack:dev": "npm run workbench:build && node scripts/prepare-desktop-config.mjs && electron-builder --win nsis --x64",
+    "test:ui": "vitest run",
     "build": "npm run website:build && npm run workbench:build"
   },
   "dependencies": {
@@ -21,5 +28,13 @@
     "react-dom": "19.2.0",
     "tailwind-merge": "3.4.0"
   },
-  "devDependencies": {"@vitejs/plugin-react": "5.0.4", "vite": "6.4.2", "electron": "35.0.0"}
+  "devDependencies": {
+    "@testing-library/react": "^16.3.3",
+    "@vitejs/plugin-react": "5.0.4",
+    "electron": "35.0.0",
+    "electron-builder": "^25.1.8",
+    "jsdom": "^26.1.0",
+    "vite": "6.4.2",
+    "vitest": "^2.1.9"
+  }
 }

@@ -1,0 +1,74 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: tongpin
+      MYSQL_USER: tongpin
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      retries: 20
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    environment: &backend_env
+      APP_ENV: production
+      APP_ORIGIN: ${APP_ORIGIN:?set HTTPS APP_ORIGIN}
+      DATABASE_URL: mysql+asyncmy://tongpin:${MYSQL_PASSWORD:?set MYSQL_PASSWORD}@mysql:3306/tongpin
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      COOKIE_SECURE: "true"
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN:?set ANTHROPIC_AUTH_TOKEN}
+      ANTHROPIC_BASE_URL: https://api.deepseek.com/anthropic
+      ANTHROPIC_MODEL: deepseek-v4-flash
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:?set OSS_ACCESS_KEY_ID}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:?set OSS_ACCESS_KEY_SECRET}
+      OSS_BUCKET: wh-syyoss
+      OSS_REGION: cn-beijing
+      OSS_ENDPOINT: https://oss-cn-beijing.aliyuncs.com
+    command: alembic upgrade head
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    environment: *backend_env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips '*'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/live')"]
+      interval: 10s
+      retries: 10
+
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    environment: *backend_env
+    command: python -m app.worker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.frontend
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+
+volumes:
+  mysql_data:

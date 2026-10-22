@@ -25,7 +25,7 @@ function AppContent({mode='web'}){
  useEffect(()=>()=>{timers.current.forEach(clearTimeout)},[]);
  useEffect(()=>{const fn=()=>setView(mode);window.addEventListener('popstate',fn);return()=>window.removeEventListener('popstate',fn)},[mode]);
  function notify(t){setToast(t)}
- function navigate(v){if(v==='site'&&mode!=='site'){location.assign(import.meta.env.VITE_WEBSITE_URL||'http://localhost:5173/');return}if(v==='web'&&mode==='site'){location.assign(import.meta.env.VITE_WORKBENCH_URL||'http://localhost:5174/');return}setView(v);setMini(false);setSiteMenu(false);window.scrollTo(0,0)}
+ function navigate(v){if(v==='site'&&mode!=='site'){location.assign(import.meta.env.VITE_WEBSITE_URL||(import.meta.env.PROD?'/':'http://localhost:5173/'));return}if(v==='web'&&mode==='site'){location.assign(import.meta.env.VITE_WORKBENCH_URL||(import.meta.env.PROD?'/login':'http://localhost:5174/'));return}if(v==='desktop'&&mode==='site'){location.assign(import.meta.env.VITE_DESKTOP_DOWNLOAD_URL||'/downloads/Tongpin-AI-0.1.0-x64.exe');return}setView(v);setMini(false);setSiteMenu(false);window.scrollTo(0,0)}
  function later(fn,ms){const id=setTimeout(()=>{timers.current.delete(id);fn()},ms);timers.current.add(id)}
  function updateRoom(rid,fn){setData(d=>({...d,rooms:d.rooms.map(r=>r.id===rid?fn(r):r)}))}
  function patchMessage(rid,id,patch){updateRoom(rid,r=>({...r,messages:r.messages.map(m=>m.id===id?{...m,...patch}:m)}))}

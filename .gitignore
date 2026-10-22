@@ -11,3 +11,4 @@ __pycache__/
 *.log
 *.egg-info/
 apps/desktop/out/
+apps/desktop/public-config.json

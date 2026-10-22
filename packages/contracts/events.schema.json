@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tongpin room event",
+  "type": "object",
+  "required": ["type", "room_id", "seq", "payload"],
+  "properties": {
+    "type": {
+      "enum": ["message.created", "message.delta", "message.completed", "run.step.started", "run.completed", "run.failed", "tool.completed"]
+    },
+    "room_id": {"type": "string", "format": "uuid"},
+    "seq": {"type": "integer", "minimum": 1},
+    "payload": {"type": "object"}
+  },
+  "additionalProperties": false
+}

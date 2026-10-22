@@ -1,0 +1,18 @@
+appId: com.tongpin.desktop
+productName: Tongpin AI
+directories:
+  output: dist/desktop
+files:
+  - apps/desktop/**
+  - dist/workbench/**
+  - package.json
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  signAndEditExecutable: false
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+artifactName: Tongpin-AI-${version}-${arch}.${ext}
