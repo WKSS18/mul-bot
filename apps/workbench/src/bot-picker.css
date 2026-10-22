@@ -1,0 +1,19 @@
+.connected-bot-chip,
+.connected-add-bot {
+  border: 1px solid #d8e5fb;
+  border-radius: 16px;
+  padding: 6px 11px;
+  color: #2563eb;
+  background: #fff;
+  white-space: nowrap;
+}
+.connected-bot-chip:hover,
+.connected-add-bot:hover { background: #eaf1ff; }
+.connected-bot-picker { display: grid; gap: 10px; max-height: 360px; overflow: auto; }
+.connected-bot-picker > input { border: 1px solid #d8e2f0; border-radius: 8px; padding: 10px 12px; }
+.connected-bot-option { display: flex; align-items: center; gap: 8px; padding: 11px; border: 1px solid #e6edf7; border-radius: 9px; }
+.connected-bot-option > div { min-width: 0; flex: 1; }
+.connected-bot-option strong,.connected-bot-option small { display: block; }
+.connected-bot-option small { color: #8797ab; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.connected-bot-option .button { min-width: auto; height: 32px; padding: 0 10px; }
+.button-quiet { color: #71829c; background: #f5f7fb; }

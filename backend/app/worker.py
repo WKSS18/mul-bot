@@ -1,6 +1,7 @@
 """Database-backed Bot worker. Run as a separate process: python -m app.worker."""
 import asyncio
 import json
+import re
 import time
 from datetime import timedelta
 from uuid import uuid4
@@ -193,7 +194,14 @@ async def process_one() -> bool:
         try:
             remaining = (deadline - utcnow().replace(tzinfo=None)).total_seconds()
             async with asyncio.timeout(max(0.1, remaining)):
-                answer = await ask_deepseek(question, system=bot["prompt"], model=bot["model"], on_delta=on_delta, tools=bot["tools"], on_tool=on_tool)
+                # A bare mention is an intentional address, not a complete task.
+                # Respond locally so the Bot does not spend a model call inventing a generic menu.
+                mention_only = not re.sub(r"@[^\s@]+", "", question).strip()
+                if mention_only:
+                    answer = f"你好，我是 @{bot['bot_name']}。请告诉我你希望我处理的具体问题，或直接附上数据、文件和目标。"
+                    await on_delta(answer)
+                else:
+                    answer = await ask_deepseek(question, system=bot["prompt"], model=bot["model"], on_delta=on_delta, tools=bot["tools"], on_tool=on_tool)
             if not answer.strip():
                 raise ValueError("model returned empty text")
             artifacts = []

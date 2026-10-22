@@ -1,0 +1,7 @@
+.connected-markdown .bot-mention {
+  color: #2563eb;
+  background: #eaf1ff;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-weight: 600;
+}
