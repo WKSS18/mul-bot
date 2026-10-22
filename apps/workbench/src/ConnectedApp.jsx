@@ -158,7 +158,7 @@ export function ConnectedApp() {
           if (data.type === 'message.created') setMessages(items => items.some(item => item.id === data.payload.message_id) ? items : [...items, {id:data.payload.message_id,message_seq:data.payload.message_seq,body:data.payload.body,sender_type:data.payload.sender_type || 'USER',bot_id:data.payload.bot_id,sender_id:data.payload.sender_id,attachments:data.payload.attachments||[]}]);
           if (data.type === 'message.delta' || data.type === 'message.completed') setMessages(items => items.map(item => item.id===data.payload.message_id?{...item,body:data.payload.body,attachments:data.payload.attachments||item.attachments}:item));
           if (data.type === 'tool.completed') setToolEvents(items => items.some(item=>item.seq===data.seq)?items:[...items,{seq:data.seq,...data.payload}]);
-          if (data.type?.startsWith('run.')) setRunStatus(data.type === 'run.completed' ? 'Bot 协作已完成' : data.type === 'run.failed' ? 'Bot 执行失败，请查看任务状态' : 'Bot 正在处理');
+          if (data.type?.startsWith('run.')) setRunStatus(data.type === 'run.completed' ? 'Bot 协作已完成' : data.type === 'run.failed' ? (data.payload?.code === 'MODEL_FAILED' ? '模型调用失败，请检查模型配置或稍后重试' : 'Bot 执行失败，请稍后重试') : 'Bot 正在处理');
         };
         socket.onclose = () => {if (!closed) retry = setTimeout(connect, 1200);};
       } catch (exc) {if (!closed) {setError(exc.message); retry = setTimeout(connect, 1500);}}
