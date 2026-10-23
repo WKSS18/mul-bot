@@ -51,3 +51,32 @@
 .connected-mentions button small{font-size:11px}
 .connected-composer form{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:10px;align-items:end;padding:14px 16px 10px;border:1px solid #e1e4ec;border-radius:14px;box-shadow:0 4px 18px rgba(38,49,73,.06)}
 .connected-composer-editor{display:grid;gap:8px;min-width:0}.connected-composer-preview{min-height:22px;color:#8b96a7;font-size:13px}.connected-composer-input{background:transparent!important;min-height:34px!important;max-height:80px!important;padding:0!important;font-size:14px!important}.connected-composer-toolbar{display:flex;align-items:center;gap:8px}.connected-composer-toolbar button{border:0;background:transparent;color:#667287;font-size:12px;padding:5px 7px;border-radius:6px}.connected-composer-toolbar button:first-child{background:#f6f7fa;color:#414a5d;font-weight:600}.connected-composer-toolbar button:hover{background:#eff0fc;color:#43509a}.connected-composer-toolbar button span{margin-left:8px;color:#9ba4b2}
+/* Composer rebuilt to match the MagicPath prototype hierarchy */
+.connected-composer{position:relative}
+.connected-composer form{position:relative;display:grid;grid-template-columns:34px minmax(0,1fr) 42px;gap:10px;align-items:end;padding:12px 14px 10px;border:1px solid #e3e7ef;border-radius:15px;background:#fff;box-shadow:0 8px 28px rgba(39,50,77,.07)}
+.connected-composer-editor{display:grid;grid-template-rows:minmax(34px,1fr) auto;gap:8px;min-width:0}
+.connected-composer-preview{min-height:28px;color:#25324a;font-size:14px;line-height:1.5}
+.connected-composer-input{min-height:34px!important;max-height:88px!important;border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;padding:0!important;font-size:14px!important;resize:none}
+.connected-composer-toolbar{display:flex;align-items:center;gap:12px;min-height:30px}
+.connected-composer-toolbar button{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:#66738b;font-size:12px;padding:4px 2px;border-radius:7px}
+.connected-composer-toolbar .connected-composer-bot-current{color:#27344a}
+.connected-composer-bot-avatar{width:26px;height:26px;flex:none;display:inline-grid;place-items:center;border-radius:50%;background:#7968e8;color:#fff;font-size:12px;font-weight:700}
+.connected-composer-toolbar .toolbar-chevron{color:#9aa5b6;margin-left:1px}
+.connected-composer-toolbar .toolbar-at{font-size:16px;color:#76839a}
+.connected-composer-toolbar button:hover{color:#43509a;background:#f4f5fb}
+.connected-composer form>.connected-composer-send{width:42px;height:42px;min-width:42px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:#43509a;color:white}
+.connected-composer form>.connected-composer-send:disabled{opacity:1;background:#43509a;cursor:default}
+.connected-composer-bot-picker{position:absolute;left:52px;bottom:calc(100% + 12px);z-index:25;width:min(312px,calc(100vw - 90px));padding:10px 8px 0;background:#fff;border:1px solid #e8ebf1;border-radius:14px;box-shadow:0 14px 34px rgba(32,43,67,.16)}
+.connected-composer-bot-picker-title{padding:6px 10px 10px;color:#99a3b2;font-size:11px}
+.connected-composer-bot-option{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;border-radius:9px;background:#fff;text-align:left;color:#263144}
+.connected-composer-bot-option:hover,.connected-composer-bot-option.selected{background:#f4f5fc}
+.connected-composer-bot-option:nth-of-type(2) .connected-composer-bot-avatar{background:#e48c67}
+.connected-composer-bot-option:nth-of-type(3) .connected-composer-bot-avatar{background:#5597a6}
+.connected-composer-bot-copy{display:grid;gap:3px;min-width:0}
+.connected-composer-bot-copy strong{font-size:12px;font-weight:650}
+.connected-composer-bot-copy small{font-size:10px;color:#9ba5b4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.connected-composer-bot-check{margin-left:auto;color:#43509a}
+.connected-composer-bot-done{display:block;width:100%;margin-top:4px;padding:10px;border:0;border-top:1px solid #eceef3;background:#fff;color:#5864af;font-size:11px}
+.connected-composer-bot-done:hover{color:#39468d}
+.connected-composer .connected-mentions{left:52px;bottom:calc(100% + 12px)}
+@media(max-width:600px){.connected-composer form{grid-template-columns:28px minmax(0,1fr) 40px;gap:7px;padding:10px}.connected-composer form>.connected-composer-send{width:40px;height:40px;min-width:40px}.connected-composer-bot-picker{left:36px}}
