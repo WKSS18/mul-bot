@@ -16,3 +16,4 @@
 .incoming-invite-card{display:flex;align-items:center;gap:12px;padding:16px;background:#f4f7ff;border-radius:10px}.incoming-invite-card>div:last-child{display:grid;gap:5px}.incoming-invite-card strong{color:#173b77}.incoming-invite-card p{margin:0;color:#7184a2;font-size:12px}
 .invite-inbox-button{position:relative}.invite-badge{position:absolute;top:5px;left:26px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:#ef4444;color:#fff;font-size:10px;line-height:16px;text-align:center}
 .connected-notice{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:30;padding:10px 18px;border-radius:8px;background:#eaf8f0;color:#16834b;box-shadow:0 8px 24px #245a3a22;font-size:13px}
+.incoming-invites{display:grid;gap:10px;max-height:360px;overflow:auto}.incoming-invite-card{cursor:pointer}.incoming-invite-card.selected{box-shadow:0 0 0 2px #2f6fed inset}.incoming-invite-card>button{margin-left:auto;flex:none}
