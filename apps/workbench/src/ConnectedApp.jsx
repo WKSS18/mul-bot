@@ -46,6 +46,7 @@ export function ConnectedApp() {
   const [mentionIndex, setMentionIndex] = useState(0);
   const [text, setText] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [authMode, setAuthMode] = useState('login');
   const [dialog, setDialog] = useState('');
