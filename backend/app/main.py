@@ -354,10 +354,16 @@ async def invite_member(rid: str, payload: InviteIn, user: User = Depends(curren
         raise HTTPException(403, "没有邀请成员的权限")
     await rate_limit("invite", f"{user.id}:{rid}", 30, 3600)
     token = secrets.token_urlsafe(32)
-    invitation = Invitation(room_id=room.id, email=str(payload.email).lower(), token_hash=hashlib.sha256(token.encode()).hexdigest(), created_by=user.id, expires_at=utcnow() + timedelta(days=7))
+    invitation = Invitation(room_id=room.id, email=str(payload.email).lower(), token_hash=hashlib.sha256(token.encode()).hexdigest(), token_plain=token, created_by=user.id, expires_at=utcnow() + timedelta(days=7))
     db.add(invitation)
     await db.commit()
     return wrap({"id": invitation.id, "invitation_token": token, "expires_in": 604800})
+
+
+@app.get("/api/v1/invitations/pending")
+async def pending_invitations(user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+    rows = (await db.scalars(select(Invitation).where(Invitation.email == user.email.lower(), Invitation.used_at.is_(None), Invitation.revoked_at.is_(None), Invitation.expires_at > utcnow()).order_by(Invitation.created_at.desc() if hasattr(Invitation, 'created_at') else Invitation.expires_at.desc()))).all()
+    return wrap([{"id": item.id, "token": item.token_plain, "room_id": item.room_id, "expires_at": item.expires_at.isoformat()} for item in rows if item.token_plain])
 
 
 @app.get("/api/v1/rooms/{rid}/invitations")

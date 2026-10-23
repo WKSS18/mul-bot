@@ -84,6 +84,13 @@ export function ConnectedApp() {
     return()=>{closed=true};
   },[]);
 
+  useEffect(()=>{
+    if(!token) return;
+    let stopped=false;
+    const syncInvites=async()=>{try{const rows=await request('/invitations/pending',{},token);if(stopped)return;if(rows.length){setInviteCount(rows.length);setPendingInvite(true);if(!inviteCode){setInviteCode(rows[0].token);}}else{setInviteCount(0);setPendingInvite(false);}}catch{}};
+    syncInvites(); const timer=setInterval(syncInvites,4000); return()=>{stopped=true;clearInterval(timer)};
+  },[token]);
+
   useEffect(()=>{const value=new URLSearchParams(window.location.search).get('invite');const stored=Number(window.localStorage.getItem('tongpin_invite_count')||0);if(stored>0){setInviteCount(stored);setPendingInvite(true);}if(value){const seen=window.localStorage.getItem(`tongpin_invite_seen_${value}`);const next=seen?Math.max(stored,1):stored+1;if(!seen)window.localStorage.setItem(`tongpin_invite_seen_${value}`,'1');window.localStorage.setItem('tongpin_invite_count',String(next));setInviteCount(next);setInviteCode(value);setPendingInvite(true);setDialog('accept');}},[]);
 
   useEffect(() => { roomRef.current = room; }, [room]);
