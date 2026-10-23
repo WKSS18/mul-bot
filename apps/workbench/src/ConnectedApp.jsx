@@ -20,8 +20,9 @@ async function request(path, options = {}, token) {
 
 function csrfToken(){return decodeURIComponent(document.cookie.split('; ').find(part=>part.startsWith('tp_csrf='))?.split('=')[1]||'');}
 
+const markMentions = (value) => String(value||'').split(/(@[^\s@，。！？：；、]+)/g).map((part,index) => part.startsWith('@') ? <span className="bot-mention" key={index}>{part}</span> : part);
+
 function MarkdownMessage({children}) {
-  const markMentions = (value) => String(value).split(/(@[^\s@，。！？：；、]+)/g).map((part,index) => part.startsWith('@') ? <span className="bot-mention" key={index}>{part}</span> : part);
   return <div className="connected-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{a:({children:label,...props})=><a {...props} target="_blank" rel="noreferrer">{label}</a>,img:()=>null,text:({children})=>markMentions(children)}}>{children || ''}</ReactMarkdown></div>;
 }
 
