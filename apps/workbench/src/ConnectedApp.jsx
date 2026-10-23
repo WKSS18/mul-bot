@@ -239,11 +239,14 @@ export function ConnectedApp() {
   }
 
   function composerKeyDown(event) {
-    if (event.nativeEvent.isComposing || !mentionOpen) return;
-    if (event.key === 'Escape') {event.preventDefault();setMentionOpen(false);}
-    if (event.key === 'ArrowDown') {event.preventDefault();setMentionIndex(index => (index + 1) % Math.max(mentionMatches.length, 1));}
-    if (event.key === 'ArrowUp') {event.preventDefault();setMentionIndex(index => (index - 1 + mentionMatches.length) % Math.max(mentionMatches.length, 1));}
-    if (event.key === 'Enter' && mentionMatches[mentionIndex]) {event.preventDefault();chooseMention(mentionMatches[mentionIndex]);}
+    if (event.nativeEvent.isComposing) return;
+    if (mentionOpen) {
+      if (event.key === 'Escape') {event.preventDefault();setMentionOpen(false);return;}
+      if (event.key === 'ArrowDown') {event.preventDefault();setMentionIndex(index => (index + 1) % Math.max(mentionMatches.length, 1));return;}
+      if (event.key === 'ArrowUp') {event.preventDefault();setMentionIndex(index => (index - 1 + mentionMatches.length) % Math.max(mentionMatches.length, 1));return;}
+      if (event.key === 'Enter' && mentionMatches[mentionIndex]) {event.preventDefault();chooseMention(mentionMatches[mentionIndex]);return;}
+    }
+    if (event.key === 'Enter' && !event.shiftKey) {event.preventDefault();event.currentTarget.form?.requestSubmit();}
   }
 
   async function send(event) {
