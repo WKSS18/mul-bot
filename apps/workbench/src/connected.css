@@ -17,3 +17,26 @@
 .invite-inbox-button{position:relative}.invite-badge{position:absolute;top:5px;left:26px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:#ef4444;color:#fff;font-size:10px;line-height:16px;text-align:center}
 .connected-notice{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:30;padding:10px 18px;border-radius:8px;background:#eaf8f0;color:#16834b;box-shadow:0 8px 24px #245a3a22;font-size:13px}
 .incoming-invites{display:grid;gap:10px;max-height:360px;overflow:auto}.incoming-invite-card{cursor:pointer}.incoming-invite-card.selected{box-shadow:0 0 0 2px #2f6fed inset}.incoming-invite-card>button{margin-left:auto;flex:none}
+/* Figma 1:257 visual alignment */
+:root{--orbit-primary:#43509a;--orbit-primary-strong:#39468d;--orbit-ink:#283142;--orbit-muted:#7a8594;--orbit-line:#e7e9ef;--orbit-soft:#f7f8fa;--orbit-active:#e9ebf8}
+.connected-layout{background:#fff;color:var(--orbit-ink)}
+.connected-sidebar{width:254px;background:var(--orbit-soft);border-right:1px solid var(--orbit-line);padding:24px 17px;gap:11px}
+.connected-brand{gap:11px;font-size:16px;color:var(--orbit-ink);margin:0 6px 20px}
+.connected-brand img{width:35px;height:35px;background:var(--orbit-primary);border-radius:10px;padding:6px}
+.connected-sidebar>.button.button-primary{height:43px;border-radius:10px;background:var(--orbit-primary);box-shadow:none;justify-content:center}
+.connected-sidebar h3{font-size:11px;color:#a0a9b6;margin:28px 11px 8px}
+.connected-room,.connected-side-bottom button,.connected-side-bottom a{padding:11px 13px;border-radius:10px;color:#596475;font-size:13px}
+.connected-room.active{background:var(--orbit-active);color:#45529a;font-weight:650}
+.connected-room:hover,.connected-side-bottom button:hover,.connected-side-bottom a:hover{background:#eef0fa}
+.connected-side-bottom{border-top:0;padding-top:16px}
+.connected-main>header{height:75px;min-height:75px;padding:17px 49px;border-bottom:1px solid #e9ecf2}
+.connected-main>header h2{font-size:17px;color:var(--orbit-ink)}
+.connected-main>header small{font-size:11px;color:#9ba4b2;margin-top:5px}
+.connected-header-actions{gap:10px}.connected-header-actions .button{border-color:#e8eaf1;background:#f6f7fa;color:#505b70;border-radius:9px;height:38px}.connected-user{color:#5864af}
+.connected-messages{padding:30px max(48px,calc((100% - 1005px)/2));}
+.connected-empty{margin-top:16vh;color:#9ca4b4}.connected-empty:before{content:'✦';display:block;color:#5864af;font-size:34px;margin-bottom:22px}.connected-empty{font-size:0}.connected-empty:after{content:'从一个问题开始';display:block;color:#293143;font-size:27px;font-weight:650;margin-bottom:42px}.connected-empty:after{content:'从一个问题开始';}
+.connected-composer{border-top:1px solid var(--orbit-line);padding:14px max(48px,calc((100% - 1005px)/2)) 22px;background:#fff}
+.connected-composer form{border:1px solid #dde2eb;border-radius:14px;padding:13px 16px 9px;display:grid;grid-template-columns:40px 1fr 42px;gap:10px;align-items:end}
+.connected-composer-editor{min-width:0}.connected-composer textarea{border:0;min-height:42px;max-height:64px;padding:5px 0;font-size:14px;box-shadow:none}.connected-composer textarea:focus{outline:0}.connected-composer form>.button{width:42px;height:42px;padding:0;border-radius:11px;background:var(--orbit-primary)}
+.connected-attach{height:42px;width:40px}.connected-bots{margin-bottom:10px}.connected-bots button{border:0;background:var(--orbit-soft);color:#414a5d;border-radius:10px;padding:7px 10px}
+.connected-bots button.selected{background:#eff0fc;color:#43509a}.connected-mentions{left:max(48px,calc((100% - 1005px)/2));bottom:128px}
