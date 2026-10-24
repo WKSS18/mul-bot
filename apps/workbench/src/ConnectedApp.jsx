@@ -5,6 +5,19 @@ import remarkGfm from 'remark-gfm';
 import './mentions.css';
 import './bot-picker.css';
 
+function createClientMessageId(){
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  if (globalThis.crypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+  }
+  return 'msg-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+}
+
 const base = window.tongpinDesktop?.apiBaseUrl || import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 async function request(path, options = {}, token) {
@@ -348,7 +361,7 @@ export function ConnectedApp() {
     try {
       const value = text.trim();
       const mentions = selectedBots.map((bot_id,position) => ({bot_id,position}));
-      const result = await request(`/rooms/${room.id}/messages`, {method:'POST',body:JSON.stringify({client_message_id:crypto.randomUUID(),text:value,mentions,attachment_ids:attachments.map(item=>item.id)})}, token);
+      const result = await request(`/rooms/${room.id}/messages`, {method:'POST',body:JSON.stringify({client_message_id:createClientMessageId(),text:value,mentions,attachment_ids:attachments.map(item=>item.id)})}, token);
       setMessages(items => items.some(item=>item.id===result.message_id)?items:[...items,{id:result.message_id,message_seq:result.message_seq,body:value,sender_type:'USER',sender_id:user.id,sender_name:user.display_name,attachments}]);
       setText(''); setSelectedBots([]); setAttachments([]);
       if (result.run_id) setRunStatus('Bot 已进入执行队列');

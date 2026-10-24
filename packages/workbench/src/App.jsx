@@ -8,7 +8,11 @@ const initialBots=[{id:'planner',name:'策划助手',description:'擅长产品�
 const seedMessages=[{id:'m1',role:'user',name:'小林',text:'@策划助手 帮我们梳理产品发布清单',time:'14:20'},{id:'m2',role:'bot',botId:'planner',name:'策划助手',text:'好的，以下是产品发布的主要任务清单：\n\n1. 明确发布目标与核心受众\n2. 制定内容、渠道与推广计划\n3. 确定时间节点与负责人',time:'14:20',tool:'搜索资料',toolDone:true},{id:'m3',role:'bot',botId:'writer',name:'文案助手',text:'基于 @策划助手 的清单，我为本次产品发布拟定了一段对外文案：\n\n同频 AI，助力团队与 AI 在同一个聊天室协作。通过 @Bot 即可获得专业支持，结合工具完成任务，并将结果保留在对话中。让协作更简单，成果更清楚。',time:'14:22',parent:'策划助手'}];
 function initial(){try{const data=JSON.parse(localStorage.getItem(KEY));if(data?.rooms?.length&&data?.bots)return {...data,rooms:data.rooms.map(r=>({...r,messages:r.messages.map(m=>({...m,streaming:false,toolDone:true}))}))}}catch{}return {bots:initialBots,rooms:[{id:'launch',name:'产品发布讨论',members:['小林','产品经理','设计师'],botIds:['planner','writer'],messages:seedMessages},{id:'research',name:'市场调研讨论',members:['小林','产品经理'],botIds:['planner'],messages:[]},{id:'tech',name:'技术方案评审',members:['小林','设计师'],botIds:['planner','writer'],messages:[]}]}}
 function now(){return new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}
-function uid(){return crypto.randomUUID()}
+function uid(){
+ if(globalThis.crypto?.randomUUID)return globalThis.crypto.randomUUID();
+ if(globalThis.crypto?.getRandomValues){const bytes=new Uint8Array(16);globalThis.crypto.getRandomValues(bytes);bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;const hex=Array.from(bytes,v=>v.toString(16).padStart(2,'0')).join('');return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`}
+ return 'demo-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)
+}
 function Brand({small=false}){return <span className={'brand '+(small?'brand-small':'')}><img src="/assets/brand.png" alt=""/><span><strong>同频 AI</strong>{!small&&<small>T O N G P I N</small>}</span></span>}
 function Avatar({bot=false,name='小林',purple=false}){return bot?<span className={'avatar avatar-bot '+(purple?'purple':'')}><Bot size={21}/></span>:<img className="avatar" alt={name+'头像'} src={'/assets/'+(name==='小林'?'xiaolin':name==='设计师'?'designer':'manager')+'.png'}/>}
 function AppContent({mode='web'}){
