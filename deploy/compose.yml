@@ -18,11 +18,11 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.backend
     environment: &backend_env
-      APP_ENV: production
+      APP_ENV: ${APP_ENV:-staging}
       APP_ORIGIN: ${APP_ORIGIN:?set HTTPS APP_ORIGIN}
       DATABASE_URL: mysql+asyncmy://tongpin:${MYSQL_PASSWORD:?set MYSQL_PASSWORD}@mysql:3306/tongpin
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
-      COOKIE_SECURE: "true"
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN:?set ANTHROPIC_AUTH_TOKEN}
       ANTHROPIC_BASE_URL: https://api.deepseek.com/anthropic
       ANTHROPIC_MODEL: deepseek-v4-flash
