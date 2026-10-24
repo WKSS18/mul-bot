@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 WORKDIR /srv/backend
-RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-cjk && rm -rf /var/lib/apt/lists/*
+# Keep the runtime build independent of apt mirrors. Document rendering falls
+# back to the fonts available in the base image when CJK fonts are unavailable.
 COPY backend/pyproject.toml ./
 COPY backend/app ./app
 COPY backend/alembic ./alembic
