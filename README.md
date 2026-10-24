@@ -1,53 +1,180 @@
 # 同频 AI
 
-本仓库实现 [《实施方案》](docs/实施方案.md) 中的响应式官网、Bot 网页工作台、Electron Windows 桌面端和 FastAPI 服务。官网与工作台分别构建；网页和桌面共用工作台业务界面。`packages/workbench/src/App.jsx` 保留交互原型用于官网演示，实际工作台入口是 `apps/workbench/src/ConnectedApp.jsx`，数据来自服务端。
+同频 AI 是一个面向团队的多 Bot 协作聊天平台。团队成员可以在同一个聊天室里发送任务、上传资料、@指定 Bot，并让不同角色的 Bot 按顺序协作完成分析、计算、检索和文档生成。项目同时提供官网、Web 工作台、Windows Electron 客户端和 FastAPI 服务端。
 
-## 已实现的链路
+## 产品背景
 
-- 注册、登录、刷新/退出会话；工作空间、房间、邮箱邀请、成员访问；消息持久化和幂等键。
-- 单连接 WebSocket 房间事件订阅与断线按序回放；两 Bot 按明确提及顺序运行，Bot 版本快照，流式结果入库与事件更新。
-- Bot 创建、编辑新版本、启停、加入/移出房间；可选择读取附件、计算器、生成文件权限。
-- 私有 OSS 限定键/大小的直传签名、HEAD 核验、PDF/DOCX/TXT/MD 文本提取；明确请求时生成 Markdown/DOCX/PDF 产物，存储确认后才显示文件卡片。
-- Electron Main/Preload/Renderer 隔离、受限 IPC 请求、原生选文件和保存文件；Windows x64 NSIS 开发测试包。
+在合同审阅、产品讨论、交易计算和资料整理等场景中，信息通常散落在聊天、附件和多个工具里。单个智能助手难以同时覆盖业务理解、产品分析和技术执行，团队也很难追踪任务上下文、工具调用过程与最终产物。
 
-## 本次验证
+同频 AI 将聊天室作为协作入口，将 Bot 配置、成员权限、附件知识和任务结果统一保存。用户可以按角色创建 Bot，在消息中使用 `@Bot` 选择参与者；系统保存完整消息链路，并通过实时事件让成员看到 Bot 的生成状态和工具执行结果。
 
-在 Windows / Python 3.12 / Node 22 环境：后端 `pytest` 通过 24 项、前端 Vitest 通过 4 项、两个前端构建通过、Alembic 已升级到 `0004_read_positions`、Electron 主进程和 Preload 语法检查通过。真实联调使用临时进程环境变量，验证了 DeepSeek 流式响应、原生 `tool_use` 计算器调用、两 Bot 顺序执行、OSS 直传/HEAD/解析/签名访问、Markdown/DOCX/PDF 产物写入和清理。测试数据库与文件留在忽略目录，未将凭据写入源码或 Git。
+## 核心功能
 
-尚未完成的方案项在 [验收差距](docs/验收差距.md) 中逐项列出。**当前不能视为《实施方案》全部功能完成或正式生产验收通过。** Docker 部署配置已提供，但本机缺少 Docker，未执行容器集成测试；Windows 安装包未签名，也未进行图形界面安装验收。
+- **账户与工作空间**：注册、登录、刷新会话、退出登录和跨页面恢复登录状态。
+- **聊天室协作**：创建、重命名和归档聊天室，查看成员，保存消息和协作记录。
+- **成员邀请**：按邮箱发送邀请；接收方通过邀请中心查看未读邀请、查看邀请人和聊天室名称，并直接加入聊天室。
+- **Bot 管理**：创建 Bot，配置名称、描述、系统提示词和工具权限；编辑版本、启用或停用，并加入或移出聊天室。
+- **多 Bot 调度**：一条消息可以按明确的 `@Bot` 顺序触发多个 Bot，后续 Bot 可读取前序结果并继续处理。
+- **实时消息**：通过 WebSocket 推送新消息、Bot 状态、工具事件和邀请提醒；断线后按序回放事件。
+- **附件处理**：支持 PDF、DOCX、TXT、Markdown、PNG 和 JPG；上传前校验大小，服务端进行权限检查、文本提取和预览签名。
+- **工具与产物**：支持附件读取、计算器和 Markdown/DOCX/PDF 生成；工具调用过程和生成文件会显示在聊天记录中。
+- **桌面端**：Electron 主进程、Preload 和 Renderer 分离，提供受限 IPC、原生选文件和保存文件能力。
 
-## 本地启动
+## 系统架构
 
-前端安装并分别启动：
+```mermaid
+flowchart LR
+    U[浏览器 / Electron 客户端]
+    W[官网 Web 服务\nReact + Vite]
+    B[Bot 工作台\nReact + Vite]
+    N[Nginx\n独立端口]
+    A[FastAPI API]
+    S[WebSocket 实时通道]
+    Q[Worker\nBot 调度与模型流式处理]
+    DB[(MySQL)]
+    OSS[(阿里云 OSS)]
+    M[DeepSeek / Anthropic 兼容模型]
 
-```powershell
-cd D:\dz-ai\tongpin-ai
-npm ci
-npm run website:dev
-# 另一个终端：npm run workbench:dev
+    U --> W
+    U --> B
+    W --> N
+    B --> N
+    N --> A
+    N --> S
+    A --> DB
+    A --> OSS
+    A --> Q
+    Q --> DB
+    Q --> M
+    Q --> S
 ```
 
-官网 `http://127.0.0.1:5173/`，工作台 `http://127.0.0.1:5174/`。生产构建 `npm run build` 输出 `dist/website`、`dist/workbench`。本地 UI 单测 `npm run test:ui`。
+### 运行时职责
 
-后端（先复制 `.env.example` 为根目录 `.env`，填写至少 40 字符的 `JWT_SECRET`；开发可用 SQLite）：
+- **官网**负责产品介绍、功能说明和入口跳转。
+- **工作台**负责登录后的聊天室、Bot 管理、邀请中心、附件预览和协作记录。
+- **FastAPI**负责认证、权限、聊天室、消息、邀请、附件和 Bot 配置等业务接口。
+- **Worker**负责消费任务、调用模型、执行工具、写入流式结果并发布实时事件。
+- **MySQL**保存用户、聊天室、成员、Bot、消息、邀请、附件和事件数据。
+- **OSS**保存受权限控制的附件和生成文件，访问采用短时签名 URL。
+
+## 部署端口
+
+生产环境使用两个独立的 Web 服务：
+
+| 服务 | 地址 | 用途 |
+| --- | --- | --- |
+| 官网 | `http://122.51.39.141:18083/` | 产品官网 |
+| BOT 工作台 | `http://122.51.39.141:18082/` | 登录、聊天室和 Bot 协作 |
+
+两个端口共享 API、Worker、MySQL 和 OSS，但前端容器、Nginx 配置和入口页面彼此独立。端口由服务器 `.env` 中的 `WEBSITE_PORT` 和 `BOT_PORT` 控制；部署时请确认没有占用现有系统服务端口。
+
+## 目录结构
+
+```text
+.
+├─ apps/
+│  ├─ website/          # 官网 React/Vite 入口
+│  ├─ workbench/        # 连接真实 API 的 BOT 工作台入口
+│  └─ desktop/          # Electron 主进程、Preload 和桌面入口
+├─ backend/
+│  ├─ app/              # FastAPI 路由、模型、服务和 Worker
+│  ├─ alembic/           # 数据库迁移
+│  └─ tests/             # 后端测试与联调测试
+├─ packages/
+│  ├─ contracts/         # 前后端共享的数据契约
+│  └─ workbench/         # UI 组件、演示数据和公共静态资源
+├─ deploy/
+│  ├─ compose.yml        # MySQL、迁移、API、Worker、官网和 BOT 服务
+│  ├─ Dockerfile.backend # 后端镜像
+│  ├─ Dockerfile.frontend# 双前端镜像
+│  ├─ nginx.conf         # 官网入口配置
+│  └─ nginx-bot.conf     # BOT 工作台入口配置
+├─ docs/                 # 实施方案、验收差距和设计说明
+├─ scripts/              # 桌面端配置和辅助脚本
+├─ tests/                # 前端 Vitest 测试
+├─ package.json          # Node 工作区和构建脚本
+└─ .env.example          # 环境变量模板
+```
+
+## 本地开发
+
+### 前端
 
 ```powershell
-cd D:\dz-ai\tongpin-ai\backend
+npm ci
+npm run website:dev       # http://127.0.0.1:5173
+npm run workbench:dev     # http://127.0.0.1:5174
+```
+
+生产构建：
+
+```powershell
+npm run build
+```
+
+构建产物位于 `dist/website` 和 `dist/workbench`。运行 UI 测试：
+
+```powershell
+npm run test:ui
+```
+
+### 后端
+
+先将根目录 `.env.example` 复制为 `.env`，填写至少 40 个字符的 `JWT_SECRET` 和模型、OSS 配置：
+
+```powershell
+cd backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e '.[test]'
 .\.venv\Scripts\python.exe -m alembic upgrade head
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-# 另一个终端：.\.venv\Scripts\python.exe -m app.worker
 ```
 
-API 文档在 `http://127.0.0.1:8000/docs`。开发模式会自动建表；生产必须先运行 Alembic。`DATABASE_URL` 指向 MySQL 时需要 `asyncmy` 驱动。
+另开终端启动任务 Worker：
 
-## 外部服务和密钥
+```powershell
+.\.venv\Scripts\python.exe -m app.worker
+```
 
-模型和 OSS 凭据仅通过后端进程环境或受控 `.env` 注入，绝不能使用 `VITE_` 前缀或打包到桌面端。参考根目录 `.env.example`。真实联调脚本 `backend/check_stream.py` 与 `backend/live_e2e.py` 会产生付费模型请求和 OSS 临时对象；运行前在当前进程配置所需环境变量，脚本不打印密钥。OSS Bucket 对网页来源需配置限定来源的 POST/GET/HEAD CORS；开发来源已在测试 Bucket 上验证，生产域名需要另外加入。原始上传文件不由后端代理下载，访问由成员权限校验后返回 60 秒签名 URL。
+API 文档地址为 `http://127.0.0.1:8000/docs`。开发环境可以使用 SQLite；使用 MySQL 时将 `DATABASE_URL` 配置为 `mysql+asyncmy` 地址。
 
-## 桌面打包与部署
+## Docker 部署
 
-桌面开发先启动工作台 Vite，然后 `npm run desktop:dev`。`npm run desktop:pack:dev` 生成本机 API 地址的未签名 NSIS 开发测试包到 `dist/desktop`。正式打包需设置 `DESKTOP_API_BASE_URL`、`DESKTOP_WS_URL`、`DESKTOP_RELEASE=true` 并在 CI 配置签名证书；仓库不包含证书、更新源凭据或正式下载域名。官网桌面下载按钮默认指向 `/downloads/Tongpin-AI-0.1.0-x64.exe`，部署时必须发布对应安装包，或设置 `VITE_DESKTOP_DOWNLOAD_URL`。
+```bash
+cp .env.example .env
+# 设置数据库密码、JWT_SECRET、模型和 OSS 凭据
+docker compose -f deploy/compose.yml --env-file .env up -d --build
+```
 
-`deploy/compose.yml`、两个 Dockerfile 和 Nginx 配置提供同域网站/工作台/API/WS + MySQL + 单 worker 的起点。它们需要受 TLS 保护的反向代理、生产域名 OSS CORS、私密环境变量和数据库备份流程。不要在未执行完整验收前直接投入生产。
+部署前至少配置：`APP_ORIGIN`、`JWT_SECRET`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、模型凭据、OSS 凭据、`WEBSITE_PORT` 和 `BOT_PORT`。生产环境应在前置反向代理上启用 HTTPS，设置安全 Cookie，配置 OSS CORS，并建立数据库备份和日志策略。
+
+## 安全与配置原则
+
+- 模型、数据库和 OSS 凭据只通过后端环境变量注入，不使用 `VITE_` 前缀暴露到浏览器。
+- 附件访问先做成员权限校验，再返回短时签名 URL；原始文件不由 API 代理下载。
+- WebSocket 会校验来源和一次性实时票据，邀请使用一次性令牌和未读计数。
+- `.env`、数据库文件、上传缓存、构建产物和桌面签名证书不提交到 Git。
+
+## 测试与验收
+
+后端测试：
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest
+```
+
+前端测试和构建：
+
+```powershell
+npm run test:ui
+npm run build
+```
+
+涉及真实模型或 OSS 的联调脚本会产生外部服务请求和临时对象，运行前请确认当前环境变量和费用预算。生产上线前还应补充 TLS、备份、监控、限流和安装包签名验收。
+
+## 许可证与状态
+
+当前仓库用于同频 AI 产品开发和部署验证。详细实施记录与未完成项见 `docs/实施方案.md` 和 `docs/验收差距.md`。
+
