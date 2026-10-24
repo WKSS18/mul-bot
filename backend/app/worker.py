@@ -62,7 +62,7 @@ async def process_one() -> bool:
         run.fence_token += 1
         fence = run.fence_token
         run_id = run.id
-        deadline = run.created_at.replace(tzinfo=None) + timedelta(seconds=600)
+        deadline = utcnow().replace(tzinfo=None) + timedelta(seconds=600)
         snapshot = json.loads(run.snapshot)
         await db.commit()
 
@@ -79,6 +79,8 @@ async def process_one() -> bool:
             if utcnow().replace(tzinfo=None) >= deadline:
                 run.status = "FAILED"
                 run.error = "RUN_DEADLINE_EXCEEDED"
+                room = await db.scalar(select(Room).where(Room.id == run.room_id).with_for_update())
+                await emit(db, room, "run.failed", {"run_id": run_id, "code": "RUN_DEADLINE_EXCEEDED"})
                 await db.commit()
                 return True
             if not await db.scalar(select(RoomMember.id).where(RoomMember.room_id == run.room_id, RoomMember.user_id == run.actor_id)):
@@ -108,6 +110,24 @@ async def process_one() -> bool:
             await emit(db, room, "run.step.started", {"run_id": run_id, "step_no": index, "bot_id": bot["bot_id"]})
             await db.commit()
         question = snapshot["question"]
+        if snapshot.get("history"):
+            transcript = []
+            remaining = 24000
+            for entry in snapshot["history"]:
+                text = entry.get("text", "")[:3000]
+                if not text or remaining <= 0:
+                    continue
+                block = f"{entry.get('speaker', '团队成员')}：{text}"
+                for attachment in entry.get("attachments", []):
+                    if "read_attachment" in bot["tools"] and remaining > 0:
+                        excerpt = attachment.get("text", "")[:min(8000, remaining)]
+                        if excerpt:
+                            block += f"\n[此前附件 {attachment.get('filename', '文件')} 内容]\n{excerpt}"
+                block = block[:remaining]
+                transcript.append(block)
+                remaining -= len(block)
+            if transcript:
+                question = "以下是当前聊天室最近的对话记录，请结合上下文理解用户的追问；不要声称看不到本聊天室已显示的历史内容。\n" + "\n".join(transcript) + "\n\n用户当前消息：\n" + question
         for attachment in snapshot.get("attachments", []):
             if "read_attachment" not in bot["tools"]:
                 continue
@@ -231,7 +251,25 @@ async def process_one() -> bool:
                 step = await db.scalar(select(RunStep).where(RunStep.run_id == run_id, RunStep.step_no == index))
                 step.status = "FAILED"
                 room = await db.scalar(select(Room).where(Room.id == run.room_id).with_for_update())
-                await emit(db, room, "run.failed", {"run_id": run_id, "step_no": index, "code": "MODEL_FAILED"})
+                error_type = type(exc).__name__
+                if error_type in {"AuthenticationError", "PermissionDeniedError"}:
+                    reason = "模型服务认证失败，请检查服务端模型密钥和权限。"
+                elif error_type == "RateLimitError":
+                    reason = "模型服务当前请求过多或额度受限，请稍后重试。"
+                elif error_type in {"APIConnectionError", "APITimeoutError", "TimeoutError"}:
+                    reason = "连接模型服务超时或失败，请检查服务地址和网络后重试。"
+                elif error_type in {"NotFoundError", "BadRequestError"}:
+                    reason = "模型服务拒绝了请求，请检查模型名称和服务配置。"
+                elif error_type == "ValueError":
+                    reason = "模型返回了空回复，请重新发送；如果再次发生，请检查模型服务的响应格式。"
+                elif error_type == "ModelResponseIncomplete":
+                    reason = "本次回复未完整生成（输出额度耗尽或响应中断），请重试或缩小问题范围。"
+                else:
+                    reason = f"模型调用失败（{error_type}），请检查模型配置或稍后重试。"
+                message = await db.get(Message, message_id)
+                message.body = (message.body.rstrip() + "\n\n" if message.body.strip() else "") + reason
+                await emit(db, room, "message.completed", {"message_id": message.id, "message_seq": message.message_seq, "body": message.body})
+                await emit(db, room, "run.failed", {"run_id": run_id, "step_no": index, "code": "MODEL_FAILED", "reason": reason})
                 await db.commit()
             return True
         finally:

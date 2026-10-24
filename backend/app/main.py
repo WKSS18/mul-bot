@@ -362,8 +362,8 @@ async def invite_member(rid: str, payload: InviteIn, user: User = Depends(curren
 
 @app.get("/api/v1/invitations/pending")
 async def pending_invitations(user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
-    rows = (await db.execute(select(Invitation, Room.name).join(Room, Room.id == Invitation.room_id).where(Invitation.email == user.email.lower(), Invitation.used_at.is_(None), Invitation.revoked_at.is_(None), Invitation.expires_at > utcnow()).order_by(Invitation.expires_at.desc()))).all()
-    return wrap([{"id": item.id, "token": item.token_plain, "room_id": item.room_id, "room_name": name, "expires_at": item.expires_at.isoformat()} for item, name in rows if item.token_plain])
+    rows = (await db.execute(select(Invitation, Room.name, User.display_name).join(Room, Room.id == Invitation.room_id).join(User, User.id == Invitation.created_by).where(Invitation.email == user.email.lower(), Invitation.used_at.is_(None), Invitation.revoked_at.is_(None), Invitation.expires_at > utcnow()).order_by(Invitation.expires_at.desc()))).all()
+    return wrap([{"id": item.id, "token": item.token_plain, "room_id": item.room_id, "room_name": name or f"聊天室 {item.room_id[:8]}", "name": name or f"聊天室 {item.room_id[:8]}", "inviter_name": inviter_name, "expires_at": item.expires_at.isoformat()} for item, name, inviter_name in rows if item.token_plain])
 
 
 @app.get("/api/v1/rooms/{rid}/invitations")
@@ -425,9 +425,13 @@ async def messages(rid: str, before_seq: int | None = None, limit: int = 50, use
         q = q.where(Message.message_seq < before_seq)
     rows = (await db.scalars(q.order_by(Message.message_seq.desc()).limit(min(max(limit, 1), 100)))).all()
     result = []
+    user_ids = {m.sender_id for m in rows if m.sender_id}
+    sender_names = {}
+    if user_ids:
+        sender_names = dict((await db.execute(select(User.id, User.display_name).where(User.id.in_(user_ids)))).all())
     for m in reversed(rows):
         files = (await db.execute(select(FileRecord.id, FileRecord.filename, FileRecord.mime, FileRecord.parse_state).join(MessageAttachment, MessageAttachment.file_id == FileRecord.id).where(MessageAttachment.message_id == m.id))).all()
-        result.append({"id": m.id, "message_seq": m.message_seq, "sender_id": m.sender_id, "sender_type": m.sender_type, "bot_id": m.bot_id, "body": m.body, "created_at": m.created_at.isoformat(), "attachments": [{"id": f.id, "filename": f.filename, "mime": f.mime, "parse_state": f.parse_state} for f in files]})
+        result.append({"id": m.id, "message_seq": m.message_seq, "sender_id": m.sender_id, "sender_name": sender_names.get(m.sender_id), "sender_type": m.sender_type, "bot_id": m.bot_id, "body": m.body, "created_at": m.created_at.isoformat(), "attachments": [{"id": f.id, "filename": f.filename, "mime": f.mime, "parse_state": f.parse_state} for f in files]})
     return wrap(result)
 
 
@@ -503,6 +507,77 @@ async def send_message(rid: str, payload: MessageIn, user: User = Depends(curren
                 raise HTTPException(422, "提及的 Bot 不在此聊天室")
             version = await db.get(BotVersion, bot.current_version_id)
             bot_snapshots.append({"bot_id": bot.id, "bot_name": bot.name, "version_id": version.id, "prompt": version.prompt, "model": version.model_name, "tools": json.loads(version.tool_allowlist)})
+    else:
+        # Continue the active Bot conversation when the user sends a natural
+        # follow-up without repeating @. A recent Bot reply is the signal; new
+        # chats and ordinary member-to-member messages remain untouched.
+        latest_message = await db.scalar(
+            select(Message).where(Message.room_id == rid, Message.body != "")
+            .order_by(Message.message_seq.desc()).limit(1)
+        )
+        latest_created_at = latest_message.created_at.replace(tzinfo=utcnow().tzinfo) if latest_message else None
+        if latest_message and latest_message.sender_type == "BOT" and latest_created_at >= utcnow() - timedelta(minutes=30):
+            previous_run = await db.scalar(
+                select(Run).where(Run.room_id == rid, Run.status == "COMPLETED")
+                .order_by(Run.created_at.desc()).limit(1)
+            )
+            if previous_run:
+                previous_snapshot = json.loads(previous_run.snapshot)
+                previous_bot_ids = [entry["bot_id"] for entry in previous_snapshot.get("bots", [])]
+                if latest_message.bot_id in previous_bot_ids:
+                    for bot_id in previous_bot_ids:
+                        bot = await db.get(Bot, bot_id)
+                        attached = await db.scalar(select(RoomBot.id).where(RoomBot.room_id == rid, RoomBot.bot_id == bot_id))
+                        if not bot or not bot.enabled or not attached or bot.workspace_id != room.workspace_id:
+                            continue
+                        version = await db.get(BotVersion, bot.current_version_id)
+                        bot_snapshots.append({"bot_id": bot.id, "bot_name": bot.name, "version_id": version.id, "prompt": version.prompt, "model": version.model_name, "tools": json.loads(version.tool_allowlist)})
+    if attachments:
+        readers = [item for item in bot_snapshots if "read_attachment" in item["tools"]]
+        if not readers and not payload.mentions:
+            candidates = (await db.execute(
+                select(Bot, BotVersion)
+                .join(RoomBot, RoomBot.bot_id == Bot.id)
+                .join(BotVersion, BotVersion.id == Bot.current_version_id)
+                .where(RoomBot.room_id == rid, Bot.workspace_id == room.workspace_id, Bot.enabled.is_(True))
+                .order_by(Bot.created_at)
+            )).all()
+            for candidate, version in candidates:
+                tools = json.loads(version.tool_allowlist)
+                if "read_attachment" in tools:
+                    bot_snapshots = [{"bot_id": candidate.id, "bot_name": candidate.name, "version_id": version.id, "prompt": version.prompt, "model": version.model_name, "tools": tools}]
+                    break
+        elif not readers:
+            raise HTTPException(422, "所选 Bot 未启用附件读取，请在 Bot 管理中开启“读取附件”后重试")
+        if not bot_snapshots:
+            raise HTTPException(422, "当前聊天室没有启用附件读取的 Bot，请先在 Bot 管理中创建或加入一个可读取附件的 Bot")
+    history = []
+    if bot_snapshots:
+        # Keep a bounded transcript so short follow-ups such as “继续” retain the
+        # context of this room. The current message is added after this snapshot.
+        history_rows = list((await db.scalars(
+            select(Message).where(Message.room_id == rid, Message.body != "")
+            .order_by(Message.message_seq.desc()).limit(12)
+        )).all())
+        history_rows.reverse()
+        history = []
+        for old_message in history_rows:
+            if old_message.sender_type == "BOT":
+                old_bot = await db.get(Bot, old_message.bot_id) if old_message.bot_id else None
+                speaker = old_bot.name if old_bot else "Bot"
+            else:
+                old_user = await db.get(User, old_message.sender_id) if old_message.sender_id else None
+                speaker = old_user.display_name if old_user else "团队成员"
+            entry = {"speaker": speaker, "text": old_message.body[:3000], "attachments": []}
+            old_files = (await db.execute(
+                select(FileRecord.filename, FileRecord.extracted_text, FileRecord.parse_state)
+                .join(MessageAttachment, MessageAttachment.file_id == FileRecord.id)
+                .where(MessageAttachment.message_id == old_message.id)
+            )).all()
+            for filename, extracted_text, parse_state in old_files:
+                if parse_state == "READY" and extracted_text:
+                    entry["attachments"].append({"filename": filename, "text": extracted_text[:8000]})
+            history.append(entry)
     room = await db.scalar(select(Room).where(Room.id == rid).with_for_update())
     if bot_snapshots:
         queued = await db.scalar(select(func.count(Run.id)).where(Run.room_id == rid, Run.status.in_(["PENDING", "RUNNING"])))
@@ -514,12 +589,12 @@ async def send_message(rid: str, payload: MessageIn, user: User = Depends(curren
     await db.flush()
     for file in attachments:
         db.add(MessageAttachment(message_id=message.id, file_id=file.id))
-    event = RoomEvent(room_id=rid, seq=room.next_event_seq, type="message.created", payload=json.dumps({"message_id": message.id, "message_seq": message.message_seq, "sender_id": user.id, "body": message.body, "attachments": [{"id": f.id, "filename": f.filename, "mime": f.mime, "parse_state": f.parse_state} for f in attachments]}, ensure_ascii=False))
+    event = RoomEvent(room_id=rid, seq=room.next_event_seq, type="message.created", payload=json.dumps({"message_id": message.id, "message_seq": message.message_seq, "sender_id": user.id, "sender_name": user.display_name, "body": message.body, "attachments": [{"id": f.id, "filename": f.filename, "mime": f.mime, "parse_state": f.parse_state} for f in attachments]}, ensure_ascii=False))
     room.next_event_seq += 1
     db.add(event)
     run_id = None
     if bot_snapshots:
-        run = Run(room_id=rid, actor_id=user.id, source_message_id=message.id, snapshot=json.dumps({"question": payload.text, "bots": bot_snapshots, "attachments": [{"file_id": file.id, "filename": file.filename, "text": (file.extracted_text or "")[:20000]} for file in attachments]}, ensure_ascii=False))
+        run = Run(room_id=rid, actor_id=user.id, source_message_id=message.id, snapshot=json.dumps({"question": payload.text, "history": history, "bots": bot_snapshots, "attachments": [{"file_id": file.id, "filename": file.filename, "text": (file.extracted_text or "")[:20000]} for file in attachments]}, ensure_ascii=False))
         db.add(run)
         await db.flush()
         run_id = run.id
@@ -586,6 +661,9 @@ async def realtime(websocket: WebSocket):
         await websocket.send_json({"type": "authenticated"})
         room_id = None
         after_seq = 0
+        invitation_subscribed = False
+        invitation_ids = set()
+        last_invitation_check = 0.0
         while True:
             try:
                 command = await asyncio.wait_for(websocket.receive_json(), timeout=0.25)
@@ -603,6 +681,15 @@ async def realtime(websocket: WebSocket):
                     room_id = requested
                     after_seq = max(int(command.get("after_seq", 0)), 0)
                     await websocket.send_json({"type": "subscribed", "room_id": room_id})
+                elif command.get("type") == "subscribe_invitations":
+                    invitation_subscribed = True
+                    async with SessionLocal() as db:
+                        current_user = await db.get(User, user_id)
+                        if current_user:
+                            rows = (await db.execute(select(Invitation.id).where(Invitation.email == current_user.email.lower(), Invitation.used_at.is_(None), Invitation.revoked_at.is_(None), Invitation.expires_at > utcnow()))).all()
+                            invitation_ids = {row.id for row in rows}
+                    last_invitation_check = 0.0
+                    await websocket.send_json({"type": "invitation.sync"})
                 elif command.get("type") == "ping":
                     await websocket.send_json({"type": "pong"})
             except asyncio.TimeoutError:
@@ -616,6 +703,16 @@ async def realtime(websocket: WebSocket):
                     for event in rows:
                         await websocket.send_json({"type": event.type, "room_id": room_id, "seq": event.seq, "payload": json.loads(event.payload)})
                         after_seq = event.seq
+            if invitation_subscribed and time.monotonic() - last_invitation_check >= 2:
+                last_invitation_check = time.monotonic()
+                async with SessionLocal() as db:
+                    current_user = await db.get(User, user_id)
+                    if current_user:
+                        rows = (await db.execute(select(Invitation.id, Invitation.room_id).where(Invitation.email == current_user.email.lower(), Invitation.used_at.is_(None), Invitation.revoked_at.is_(None), Invitation.expires_at > utcnow()))).all()
+                        for invitation_id, invited_room_id in rows:
+                            if invitation_id not in invitation_ids:
+                                invitation_ids.add(invitation_id)
+                                await websocket.send_json({"type": "invitation.created", "payload": {"invitation_id": invitation_id, "room_id": invited_room_id}})
     except (WebSocketDisconnect, asyncio.TimeoutError):
         return
 

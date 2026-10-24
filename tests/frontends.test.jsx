@@ -59,3 +59,31 @@ test('connected workbench logs in and creates a persisted room through API', asy
   fireEvent.click(screen.getByRole('button',{name:'协作记录'}));
   await waitFor(()=>expect(screen.getByText('项目计划')).toBeTruthy());
 });
+
+test('connected workbench previews an uploaded PDF when its MIME metadata is missing', async () => {
+  const calls=[];
+  const dataFor=(url,options)=>{
+    if(url.endsWith('/auth/login'))return {access_token:'test-token'};
+    if(url.endsWith('/me'))return {id:'user-1',display_name:'测试用户',workspaces:[{id:'workspace-1',role:'OWNER'}]};
+    if(url.endsWith('/workspaces/workspace-1/rooms'))return [{id:'room-1',name:'团队讨论',revision:1,archived:false}];
+    if(url.includes('/bots?'))return [];
+    if(url.endsWith('/invitations/pending'))return [];
+    if(url.endsWith('/rooms/room-1/bootstrap'))return {messages:[{id:'message-1',message_seq:1,sender_type:'USER',sender_id:'user-1',sender_name:'测试用户',body:'请看附件',attachments:[{id:'file-1',filename:'contract.pdf'}]}],snapshot_seq:1,room:{id:'room-1',name:'团队讨论',revision:1,archived:false}};
+    if(url.endsWith('/rooms/room-1/bots')||url.endsWith('/rooms/room-1/members'))return [];
+    if(url.endsWith('/rooms/room-1/read-position'))return {message_seq:1};
+    if(url.endsWith('/realtime/tickets'))return {ticket:'test-ticket'};
+    if(url.endsWith('/files/file-1/access?mode=preview'))return {url:'https://files.example/contract.pdf'};
+    throw new Error(`Unexpected API path: ${url}`);
+  };
+  vi.stubGlobal('fetch',vi.fn(async(url,options)=>{calls.push([url,options]);return new Response(JSON.stringify({data:dataFor(url,options)}),{status:200,headers:{'Content-Type':'application/json'}});}));
+  class FakeSocket {send(){} close(){}}
+  vi.stubGlobal('WebSocket',FakeSocket);
+  render(<ConnectedApp/>);
+  fireEvent.change(screen.getByPlaceholderText('邮箱'),{target:{value:'user@example.com'}});
+  fireEvent.change(screen.getByPlaceholderText('密码'),{target:{value:'testing-password-123'}});
+  fireEvent.click(screen.getByRole('button',{name:'登录'}));
+  const attachment=await screen.findByRole('button',{name:'contract.pdf'});
+  fireEvent.click(attachment);
+  await waitFor(()=>expect(screen.getByTitle('contract.pdf').getAttribute('src')).toBe('https://files.example/contract.pdf'));
+  expect(calls.some(([url])=>url.endsWith('/files/file-1/access?mode=preview'))).toBe(true);
+});

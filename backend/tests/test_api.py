@@ -3,13 +3,10 @@ import atexit
 from types import SimpleNamespace
 from uuid import uuid4
 
-_test_db = f'test-tongpin-{uuid4().hex}.db'
-os.environ['DATABASE_URL'] = f'sqlite+aiosqlite:///./{_test_db}'
-os.environ['JWT_SECRET'] = 'test-only-secret-that-is-long-enough-for-local-tests-123'
-atexit.register(lambda: os.path.exists(_test_db) and os.unlink(_test_db))
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from fastapi.testclient import TestClient
 
 from app.main import app
 from app.config import settings
@@ -109,11 +106,40 @@ async def test_invitation_two_users_share_room():
             assert (await client.get(f"/api/v1/rooms/{room['id']}/messages", headers=guest_headers)).status_code == 404
             invited = await client.post(f"/api/v1/rooms/{room['id']}/invitations", headers=owner_headers, json={'email': guest_email})
             token = invited.json()['data']['invitation_token']
+            pending = (await client.get('/api/v1/invitations/pending', headers=guest_headers)).json()['data']
+            assert pending[0]['room_name'] == '双人协作'
+            assert pending[0]['inviter_name'] == '房主'
             assert (await client.post('/api/v1/invitations/accept', headers=owner_headers, json={'token': token})).status_code == 403
             assert (await client.post('/api/v1/invitations/accept', headers=guest_headers, json={'token': token})).status_code == 200
             assert (await client.post('/api/v1/invitations/accept', headers=guest_headers, json={'token': token})).status_code == 404
             assert len((await client.get(f"/api/v1/rooms/{room['id']}/members", headers=guest_headers)).json()['data']) == 2
-            assert (await client.get(f"/api/v1/rooms/{room['id']}/messages", headers=guest_headers)).status_code == 200
+            sent = await client.post(f"/api/v1/rooms/{room['id']}/messages", headers=guest_headers, json={'client_message_id': str(uuid4()), 'text': '你好', 'mentions': []})
+            assert sent.status_code == 202
+            history = (await client.get(f"/api/v1/rooms/{room['id']}/messages", headers=owner_headers)).json()['data']
+            assert history[-1]['sender_name'] == '受邀人'
+
+
+def test_invitation_websocket_notifies_new_pending_invite():
+    with TestClient(app) as client:
+        owner_email = f'{uuid4()}@example.com'
+        invited_email = f'{uuid4()}@example.com'
+        owner = client.post('/api/v1/auth/register', json={'email': owner_email, 'display_name': '邀请人', 'password': 'testing-password-123'}).json()['data']
+        invited = client.post('/api/v1/auth/register', json={'email': invited_email, 'display_name': '受邀人', 'password': 'testing-password-123'}).json()['data']
+        owner_headers = {'Authorization': f"Bearer {owner['access_token']}"}
+        invited_headers = {'Authorization': f"Bearer {invited['access_token']}"}
+        room = client.post(f"/api/v1/workspaces/{owner['workspace_id']}/rooms", headers=owner_headers, json={'name': '产品讨论'}).json()['data']
+        ticket = client.post('/api/v1/realtime/tickets', headers=invited_headers).json()['data']['ticket']
+
+        with client.websocket_connect('/api/v1/realtime') as websocket:
+            websocket.send_json({'type': 'auth', 'ticket': ticket})
+            assert websocket.receive_json()['type'] == 'authenticated'
+            websocket.send_json({'type': 'subscribe_invitations'})
+            assert websocket.receive_json()['type'] == 'invitation.sync'
+            response = client.post(f"/api/v1/rooms/{room['id']}/invitations", headers=owner_headers, json={'email': invited_email})
+            assert response.status_code == 201
+            notification = websocket.receive_json()
+            assert notification['type'] == 'invitation.created'
+            assert notification['payload']['room_id'] == room['id']
 
 
 @pytest.mark.asyncio

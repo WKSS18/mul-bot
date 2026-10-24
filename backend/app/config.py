@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     anthropic_auth_token: str = ""
     anthropic_base_url: str = "https://api.deepseek.com/anthropic"
     anthropic_model: str = "deepseek-v4-flash"
+    model_max_tokens: int = 20000
     api_timeout_ms: int = 600000
     oss_bucket: str = "wh-syyoss"
     oss_region: str = "cn-beijing"

@@ -23,6 +23,15 @@ TOOL_SCHEMAS = {
 }
 
 
+class ModelResponseIncomplete(RuntimeError):
+    """The provider exhausted its budget or ended without a final turn."""
+
+
+def validate_response(response):
+    if response.stop_reason not in {"end_turn", "stop_sequence", "tool_use"}:
+        raise ModelResponseIncomplete(f"Model stopped with {response.stop_reason}")
+
+
 async def ask_deepseek(prompt: str, system: str = "你是同频 AI 助手。", model: str | None = None, on_delta=None, tools: list[str] | None = None, on_tool=None) -> str:
     if not model_ready():
         raise RuntimeError("ANTHROPIC_AUTH_TOKEN is not configured")
@@ -39,12 +48,13 @@ async def ask_deepseek(prompt: str, system: str = "你是同频 AI 助手。", m
             collected = []
             tool_count = 0
             for _ in range(12):
-                async with client.messages.stream(model=model or settings.anthropic_model, max_tokens=1024, system=system, messages=messages, tools=enabled) as stream:
+                async with client.messages.stream(model=model or settings.anthropic_model, max_tokens=settings.model_max_tokens, system=system, messages=messages, tools=enabled) as stream:
                     async for delta in stream.text_stream:
                         collected.append(delta)
                         if on_delta:
                             await on_delta(delta)
                     response = await stream.get_final_message()
+                validate_response(response)
                 requests = [block for block in response.content if getattr(block, "type", None) == "tool_use"]
                 if not requests:
                     return "".join(collected)
@@ -67,21 +77,24 @@ async def ask_deepseek(prompt: str, system: str = "你是同频 AI 助手。", m
         if on_delta is None:
             response = await client.messages.create(
                 model=model or settings.anthropic_model,
-                max_tokens=1024,
+                max_tokens=settings.model_max_tokens,
                 system=system,
                 messages=[{"role": "user", "content": prompt}],
             )
+            validate_response(response)
             return "".join(block.text for block in response.content if getattr(block, "type", None) == "text")
         chunks = []
         async with client.messages.stream(
             model=model or settings.anthropic_model,
-            max_tokens=1024,
+            max_tokens=settings.model_max_tokens,
             system=system,
             messages=[{"role": "user", "content": prompt}],
         ) as stream:
             async for delta in stream.text_stream:
                 chunks.append(delta)
                 await on_delta(delta)
+            response = await stream.get_final_message()
+        validate_response(response)
         return "".join(chunks)
 
 
