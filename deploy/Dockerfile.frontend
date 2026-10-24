@@ -4,7 +4,8 @@ COPY package.json package-lock.json ./
 COPY apps ./apps
 COPY packages ./packages
 COPY vitest.config.mjs ./
-RUN npm ci && npm run build
+# The web bundle does not need Electron's native postinstall download.
+RUN npm ci --ignore-scripts && npm run build
 
 FROM nginx:1.27-alpine
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
