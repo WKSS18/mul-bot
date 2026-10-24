@@ -637,7 +637,8 @@ async def realtime_ticket(user: User = Depends(current_user), db: AsyncSession =
 @app.websocket("/api/v1/realtime")
 async def realtime(websocket: WebSocket):
     origin = websocket.headers.get("origin")
-    allowed_origins = {settings.app_origin, "app://ui"}
+    allowed_origins = {origin.strip() for origin in settings.app_origin.split(",") if origin.strip()}
+    allowed_origins.add("app://ui")
     if settings.app_env == "development":
         allowed_origins.update({"http://localhost:5174", "http://127.0.0.1:5174"})
     if origin and origin not in allowed_origins:
