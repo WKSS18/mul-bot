@@ -124,3 +124,5 @@
 
 .connected-composer-preview .bot-mention{padding:0;font-weight:inherit}
 .connected-user{display:flex;align-items:center;gap:8px;min-width:0;max-width:min(24vw,220px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#5864af;flex:0 1 auto;font-weight:600}.connected-user::before{content:'👤';display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:#dce8fb;color:#2563eb;font-size:14px;font-weight:400}
+.connected-thinking{display:flex;align-items:center;gap:12px;padding:18px 20px;margin-top:8px;border-radius:16px;background:#f5f6fb;color:#7885a2;font-size:14px;min-width:200px}
+.thinking-dots{display:inline-flex;gap:5px}.thinking-dots i{width:6px;height:6px;border-radius:50%;background:#6665bf;animation:bot-thinking 1.2s infinite ease-in-out}.thinking-dots i:nth-child(2){animation-delay:.15s}.thinking-dots i:nth-child(3){animation-delay:.3s}@keyframes bot-thinking{0%,70%,100%{opacity:.35;transform:translateY(0)}35%{opacity:1;transform:translateY(-4px)}}@media(prefers-reduced-motion:reduce){.thinking-dots i{animation:none}}
